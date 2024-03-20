@@ -1,0 +1,11 @@
+{
+  "get": ["retrieve", "fetch", "obtain", "acquire", "gather", "load"],
+  "webpage": ["web page", "site", "page", "website"],
+  "from": ["out of", "off of", "at", "in", "on", "from"],
+  "url": ["link", "address", "web address", "web link"],
+  "file": ["document", "data", "record", "paper", "folder"],
+  "write": ["record", "save", "log"],
+  "to": ["into", "in", "on", "at", "toward", "for"],
+  "wikipedia": ["wiki", "wikipedia.org", "wikipedia.com", "encyclopedia"],
+  "search": ["look up", "find", "seek", "hunt", "explore"],
+}
