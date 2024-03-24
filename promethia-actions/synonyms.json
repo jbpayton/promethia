@@ -7,5 +7,5 @@
   "write": ["record", "save", "log"],
   "to": ["into", "in", "on", "at", "toward", "for"],
   "wikipedia": ["wiki", "wikipedia.org", "wikipedia.com", "encyclopedia"],
-  "search": ["look up", "find", "seek", "hunt", "explore"],
+  "search": ["look up", "find", "seek", "hunt", "explore"]
 }
