@@ -21,6 +21,8 @@ class ActionLoader:
         # Create a semantic mapper
         self.semantic_mapper = SemanticMapper(self.token_map.string_to_synonyms_map)
 
+        self.last_result = None
+
     # Function to get the dictionary of a tool
     def register_action(self, func):
         # Extracting parameter names
@@ -126,12 +128,38 @@ class ActionLoader:
                 # get the name and dictionary of the function
                 self.register_action(obj)
 
+    def execute_action(self, action_string):
+        # Get the tokens from the string
+        # parse the string using the semantic mapper
+        action_string_list, filtered = self.semantic_mapper.parse_string(action_string)
+        token_id_list = self.token_map.get_ids_from_string_list(filtered)
+
+        # Get the action from the string
+        func_ref, params = self.function_map.get_function_reference_and_params_by_signature(token_id_list)
+        if func_ref is None:
+            return None
+
+        # for each -1 in token_id_list ad the string in the action_string_list to the params
+        parsed_args = []
+        for i, token_id in enumerate(token_id_list):
+            if token_id == -1:
+                parsed_args.append(action_string_list[i])
+
+        # Execute the function
+        self.last_result = func_ref(*parsed_args)
+
+    # TODO: Implement a function to iterate through a string and get the next action
+    def parse_string(self, input_string):
+        self.semantic_mapper.parse_string(input_string)
+
 
 if __name__ == "__main__":
-    # actions = load_actions_from_file("FileTools.py")
     action_loader = ActionLoader()
     error_state = action_loader.load_actions_from_files()
     print("done loading actions")
     if error_state is not None:
         print(f"Error loading actions: {error_state}")
     print(f"Loaded {len(action_loader.function_map)} actions")
+
+    # Test the running of an action
+    action_loader.execute_action("get webpage at 'https://en.wikipedia.org/wiki/Golem'")

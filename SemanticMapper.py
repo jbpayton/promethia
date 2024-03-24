@@ -48,7 +48,7 @@ class SemanticMapper:
         self.index = faiss.IndexFlatL2(self.d)
         self.index.add(x)
 
-    def parse_sentence(self, sentence, verbose=False):
+    def parse_string(self, sentence, verbose=False):
         # break the string into words (making sure to take care of punctuation)
         test_words, string_literals, numeric_literals = self.split_string(sentence)
 
@@ -155,8 +155,8 @@ if __name__ == "__main__":
 
     start = time.time()
     test_string = "Get the text from the webpage 'www.google.com' and store it in the file 'output.txt'"
-    sm.parse_sentence(test_string)
+    sm.parse_string(test_string)
     print(f"Time to get the functions for a sentence: {time.time() - start}")
 
     test_string = "call the function kill monkeydude 44 times"
-    sm.parse_sentence(test_string)
+    sm.parse_string(test_string)

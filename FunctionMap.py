@@ -36,12 +36,15 @@ class FunctionMap:
         return self._reverse_map.get(id, None)
 
     def get_function_reference_and_params_by_id(self, id):
+        # convert list (id) to tuple
+        id = tuple(id)
         return self._function_info_map.get(id, None)
 
     def get_function_reference_and_params_by_signature(self, function_signature):
+        function_signature = tuple(function_signature)
         id = self._map.get(function_signature, None)
         if id is None:
-            return None
+            return None, None
         return self._function_info_map.get(id, None)
 
 

@@ -10,10 +10,10 @@ class TokenMap:
         self.id_to_token = {}  # For reverse lookup
 
         # hardcode "__param__" token to id 0
-        self.token_to_id["__param__"] = 0
-        self.token_to_id["_s_literal_"] = 0
-        self.token_to_id["_n_literal_"] = 0
-        self.token_to_id["_last_result_"] = -1
+        self.token_to_id["__param__"] = -1
+        self.token_to_id["_s_literal_"] = -1
+        self.token_to_id["_n_literal_"] = -1
+        self.token_to_id["_last_result_"] = -2
         self.id_to_token[0] = "__param__"
         self.id_to_token[-1] = "_last_result_"
 
@@ -30,13 +30,21 @@ class TokenMap:
         # Update the reverse map
         self.id_to_token[token_id] = token
 
-        # check to see if this token ha synonyms, if so, then add the list of synonyms to the string_to_synonyms_map
+        # check to see if this token has synonyms, if so, then add the list of synonyms to the string_to_synonyms_map
         if token in self.synonyms:
             self.string_to_synonyms_map[token] = self.synonyms[token]
+
+        return token_id
 
     def get_token_by_id(self, token_id):
         """Return the token associated with a given ID."""
         return self.id_to_token.get(token_id, None)
+
+    def get_ids_from_string_list(self, string_list):
+        ids = []
+        for string in string_list:
+            ids.append(self.token_to_id[string])
+        return ids
 
 
 if __name__ == "__main__":
