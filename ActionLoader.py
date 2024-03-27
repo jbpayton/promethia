@@ -7,6 +7,7 @@ from itertools import product
 from TokenMap import TokenMap
 from FunctionMap import FunctionMap
 from SemanticMapper import SemanticMapper
+from VariableMap import VariableMap
 
 
 class ActionLoader:
@@ -35,6 +36,12 @@ class ActionLoader:
             return None, None
         description = func.__doc__.strip()
 
+        # check to see if there is a "_<number" at the end of the function name, if so, then assign that number as the
+        # priority
+        priority = self.function_map.priority_levels - 1  # default priority is the highest value (the lowest priority)
+        if func.__name__[-1].isdigit():
+            priority = int(func.__name__[-1])
+
         # example docstring: "get webpage (from) <url>"
         # get words from signature
         # get rid of all the punctuation except parentheses and angle brackets with regex
@@ -55,7 +62,7 @@ class ActionLoader:
         # Generate all possible signatures
         token_signature_tuples = self.generate_token_signature_tuples(words, optional_map)
         for token_signature in token_signature_tuples:
-            self.function_map.assign_function_reference_to_id(token_signature, func, params)
+            self.function_map.assign_function_reference_to_id(token_signature, func, params, priority)
 
         # return the name of the function and the dictionary
         return func.__name__, {"params": params, "words": words, "func": func}
@@ -128,30 +135,65 @@ class ActionLoader:
                 # get the name and dictionary of the function
                 self.register_action(obj)
 
-    def execute_action(self, action_string):
-        # Get the tokens from the string
-        # parse the string using the semantic mapper
-        action_string_list, filtered = self.semantic_mapper.parse_string(action_string)
-        token_id_list = self.token_map.get_ids_from_string_list(filtered)
-
+    def execute_action(self, token_id_list, action_string_list, priority=0):
         # Get the action from the string
-        func_ref, params = self.function_map.get_function_reference_and_params_by_signature(token_id_list)
+        func_ref, params = self.function_map.get_function_reference_and_params_by_signature(token_id_list, priority)
         if func_ref is None:
             return None
+
+        # token -1 is "_last_result_", we need to change and -1 to 0, and change the string to the last result
+        token_id_list = [-1 if token_id == -2 else token_id for token_id in token_id_list]
+        action_string_list = [self.last_result if action_string == "_last_result_" else
+                              action_string for action_string in action_string_list]
+
 
         # for each -1 in token_id_list ad the string in the action_string_list to the params
         parsed_args = []
         for i, token_id in enumerate(token_id_list):
             if token_id == -1:
-                parsed_args.append(action_string_list[i])
+                parsed_args.append(self.auto_parse_parameter(action_string_list[i]))
 
         # Execute the function
         self.last_result = func_ref(*parsed_args)
 
-    # TODO: Implement a function to iterate through a string and get the next action
-    def parse_string(self, input_string):
-        self.semantic_mapper.parse_string(input_string)
+    @staticmethod
+    def auto_parse_parameter(input_str):
+        # Regular expression for matching integers, including negative integers
+        if re.match(r"^-?\d+$", input_str):
+            return int(input_str)
+        # Regular expression for matching floats, including negative floats and scientific notation
+        elif re.match(r"^-?\d+(\.\d+)?(e[-+]?\d+)?$", input_str):
+            return float(input_str)
+        # Return the original string if it doesn't match the patterns
+        else:
+            return input_str
 
+    def parse_string(self, input_string):
+        action_string_list, filtered = self.semantic_mapper.parse_string(input_string)
+        token_id_list = self.token_map.get_ids_from_string_list(filtered)
+
+        # change all the -2 to -1
+        token_id_list = [-1 if token_id == -2 else token_id for token_id in token_id_list]
+
+        for priority in range(self.function_map.priority_levels):
+            current_position = 0
+            while current_position < len(token_id_list):
+                longest_signature = self.function_map.match_longest_signature(token_id_list[current_position:], priority)
+                if longest_signature is not None:
+                    print(f"Matched signature: {longest_signature} at position {current_position} priority {priority}")
+                    self.execute_action(longest_signature,
+                                        action_string_list[current_position:current_position + len(longest_signature)],
+                                        priority)
+                    # Replace the matched tokens with a parameter token, and the string with the result
+                    token_id_list[current_position] = -1
+                    action_string_list[current_position] = self.last_result
+
+                    #delete the rest of the tokens
+                    for i in range(1, len(longest_signature)):
+                        token_id_list.pop(current_position + 1)
+                        action_string_list.pop(current_position + 1)
+
+                current_position += 1
 
 if __name__ == "__main__":
     action_loader = ActionLoader()
@@ -162,4 +204,12 @@ if __name__ == "__main__":
     print(f"Loaded {len(action_loader.function_map)} actions")
 
     # Test the running of an action
-    action_loader.execute_action("get webpage at 'https://en.wikipedia.org/wiki/Golem'")
+    action_loader.parse_string("grab webpage at 'https://en.wikipedia.org/wiki/Golem' and save it to a variable named 'golem_page'")
+
+    # Test the running of an action
+    action_loader.parse_string("grab webpage at 'https://en.wikipedia.org/wiki/Golem' and save it to file 'golem.txt'")
+
+    # Test the running of an action
+    action_loader.parse_string("save webpage at 'https://en.wikipedia.org/wiki/Golem' to file 'golem2.txt'")
+
+    print(action_loader.last_result)

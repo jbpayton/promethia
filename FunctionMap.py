@@ -1,63 +1,55 @@
-from collections import defaultdict
-
 
 # A class that maps function signatures to unique IDs and vice versa
 class FunctionMap:
-    def __init__(self):
-        self._map = defaultdict(lambda: len(self._map))
-        self._reverse_map = {}
+    def __init__(self, priority_levels=3):
+        self.priority_levels = priority_levels
 
-        self._function_info_map = {}
+        # Create a list of dicts for each priority level
+        self._map = [{} for _ in range(self.priority_levels)]
+        self.min_sig_sizes = [9999 for _ in range(self.priority_levels)]
+        self.max_sig_sizes = [0 for _ in range(self.priority_levels)]
 
     def __len__(self):
         return len(self._map)
 
-    def add_or_get_id(self, function_signature):
-        """Add a new tuple of tokens representing a function signature and return its ID.
-        If the tuple already exists, return its existing ID."""
-        # Ensure the input is a tuple for hashability
-        if not isinstance(function_signature, tuple):
-            raise TypeError("Function signature must be a tuple.")
+    def assign_function_reference_to_id(self, function_signature, function_reference, parameters, priority=0):
+        # Convert to tuple to make it hashable
+        tuple(function_signature)
 
         # Get or assign new ID
-        id = self._map[function_signature]
+        self._map[priority][function_signature] = (function_reference, parameters)
 
-        # Update reverse map for easy lookup
-        self._reverse_map[id] = function_signature
+        # update min and max signature size
+        if len(function_signature) < self.min_sig_sizes[priority]:
+            self.min_sig_sizes[priority] = len(function_signature)
 
-        return id
+        if len(function_signature) > self.max_sig_sizes[priority]:
+            self.max_sig_sizes[priority] = len(function_signature)
 
-    def assign_function_reference_to_id(self, function_signature, function_reference, parameters):
-        id = self.add_or_get_id(function_signature)
-        self._function_info_map[id] = (function_reference, parameters)
-
-    def get_signature_by_id(self, id):
-        """Return the function signature tuple associated with the given ID."""
-        return self._reverse_map.get(id, None)
-
-    def get_function_reference_and_params_by_id(self, id):
-        # convert list (id) to tuple
-        id = tuple(id)
-        return self._function_info_map.get(id, None)
-
-    def get_function_reference_and_params_by_signature(self, function_signature):
+    def get_function_reference_and_params_by_signature(self, function_signature, priority=0):
         function_signature = tuple(function_signature)
-        id = self._map.get(function_signature, None)
-        if id is None:
+        ref_and_params = self._map[priority].get(function_signature, None)
+        if ref_and_params is None:
             return None, None
-        return self._function_info_map.get(id, None)
+        return self._map[priority].get(function_signature, None)
 
+    def match_longest_signature(self, input_tokens, priority=0):
+        # find the longest matching signature
+        for i in range(self.max_sig_sizes[priority], self.min_sig_sizes[priority] - 1, -1):
+            if tuple(input_tokens[:i]) in self._map[priority]:
+                return tuple(input_tokens[:i])
+        return None
 
 if __name__ == "__main__":
     # Example usage
     function_map = FunctionMap()
 
-    # Adding some function signatures and getting their IDs
-    id1 = function_map.add_or_get_id(("get", "webpage", "<url>"))
-    id2 = function_map.add_or_get_id(("get", "webpage", "from", "<url>"))
-    id3 = function_map.add_or_get_id(("get", "webpage", "<url>"))  # This should return the same ID as id1
+    # Assign a function reference to a function signature
+    def my_func1():
+        return "Hello, world!"
 
-    # Retrieving a function signature by its ID
-    signature = function_map.get_signature_by_id(id1)
+    function_map.assign_function_reference_to_id(("get", "webpage"), my_func1, ["url"], priority=0)
+    print(function_map.get_function_reference_and_params_by_signature(("get", "webpage"), priority=0))
 
-    print(id1, id2, id3, signature)
+    # Search for the longest matching signature
+    print(function_map.match_longest_signature(["get", "webpage", "https://example.com"], priority=0))

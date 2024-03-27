@@ -14,8 +14,8 @@ class TokenMap:
         self.token_to_id["_s_literal_"] = -1
         self.token_to_id["_n_literal_"] = -1
         self.token_to_id["_last_result_"] = -2
-        self.id_to_token[0] = "__param__"
-        self.id_to_token[-1] = "_last_result_"
+        self.id_to_token[-1] = "__param__"
+        self.id_to_token[-2] = "_last_result_"
 
         # load synonyms
         self.synonyms = {}

@@ -19,12 +19,16 @@ class SemanticMapper:
 
         if ids_to_descriptions is not None:
             self.id_to_descriptions = ids_to_descriptions
+            # make sure that in the id to description dictionary, the id is in the description list
+            for key in self.id_to_descriptions:
+                if key not in self.id_to_descriptions[key]:
+                    self.id_to_descriptions[key] = self.id_to_descriptions[key] + [key]
             self.build_index()
         else:
             self.id_to_descriptions = {}
 
     def add_id_and_descriptions(self, new_id, description_list, force_rebuild=False):
-        self.id_to_descriptions[new_id] = description_list
+        self.id_to_descriptions[new_id] = description_list + [new_id]
 
         if force_rebuild:
             self.build_index()
@@ -48,7 +52,7 @@ class SemanticMapper:
         self.index = faiss.IndexFlatL2(self.d)
         self.index.add(x)
 
-    def parse_string(self, sentence, verbose=False):
+    def parse_string(self, sentence, verbose=True):
         # break the string into words (making sure to take care of punctuation)
         test_words, string_literals, numeric_literals = self.split_string(sentence)
 
