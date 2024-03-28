@@ -1,6 +1,7 @@
 {
   "get": ["retrieve", "fetch", "obtain", "snatch", "acquire", "gather", "load"],
-  "variable": ["var", "variable", "value", "object"],
+  "variable": ["var", "variable"],
+  "value" : ["val", "number", "string", "contents"],
   "webpage": ["web page", "site", "page", "website"],
   "from": ["out of", "off of", "at", "from"],
   "url": ["link", "address", "web address", "web link"],

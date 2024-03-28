@@ -1,15 +1,16 @@
 import html2text
 import requests
-import VariableMap
+from VariableMap import VariableMap
 
 def store_variable_1(data, name):
-    """save <data> (to) variable (named) <name>"""
-    VariableMap.VariableMap.get_instance().set_data(name, data)
+    """save <data> to variable (named) <name>"""
+    VariableMap.get_instance().set_data(name, data)
+    print(f"Storing in variable {name}")
     return data
 
-def get_variable_1(name):
-    """get (from) variable (named) <Var_name>"""
-    return VariableMap.VariableMap.get_instance().get_data(name)
+def get_variable_0(name):
+    """(get) value from variable (named) <Var_name>"""
+    return VariableMap.get_instance().get_data(name)
 
 def store_file_1(data, name):
     """save <data> (to) file (named) <name>"""
@@ -17,7 +18,7 @@ def store_file_1(data, name):
         f.write(data)
     return data
 
-def get_file_1(name):
+def get_file_0(name):
     """get (from) file (named) <name>"""
     with open(name, 'r', encoding="utf-8") as f:
         return f.read()

@@ -141,6 +141,8 @@ class ActionLoader:
         if func_ref is None:
             return None
 
+        print("Executing function", func_ref.__name__)
+
         # token -1 is "_last_result_", we need to change and -1 to 0, and change the string to the last result
         token_id_list = [-1 if token_id == -2 else token_id for token_id in token_id_list]
         action_string_list = [self.last_result if action_string == "_last_result_" else
@@ -211,5 +213,10 @@ if __name__ == "__main__":
 
     # Test the running of an action
     action_loader.parse_string("save webpage at 'https://en.wikipedia.org/wiki/Golem' to file 'golem2.txt'")
+    # Test the running of an action
+    action_loader.parse_string(
+        "Save webpage at 'https://blazblue.fandom.com/wiki/Rachel_Alucard' to a variable named 'rachel_text'.")
+    action_loader.parse_string(
+        "Save value from variable 'rachel_text' to file 'rachel.txt'.")
 
-    print(action_loader.last_result)
+    print("done running actions")

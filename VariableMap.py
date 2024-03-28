@@ -14,13 +14,16 @@ class VariableMap:
         if VariableMap.__instance is not None:
             raise Exception("This class is a singleton!")
         else:
+            print("Creating VariableMap instance")
             VariableMap.__instance = self
             self.data_map = {}
 
     def set_data(self, key, value):
+        print(f"Setting value {key}")
         self.data_map[key] = value
 
     def get_data(self, key):
+        print(f"Getting {key}")
         return self.data_map.get(key, None)
 
 

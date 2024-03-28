@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 import faiss
 
 class SemanticMapper:
-    def __init__(self, ids_to_descriptions = None, similarity_threshold = 0.75, embedding_model = None):
+    def __init__(self, ids_to_descriptions = None, similarity_threshold = 0.7, embedding_model = None):
         self.words = []
         self.ids = []
         self.d = 0
@@ -52,7 +52,7 @@ class SemanticMapper:
         self.index = faiss.IndexFlatL2(self.d)
         self.index.add(x)
 
-    def parse_string(self, sentence, verbose=True):
+    def parse_string(self, sentence, verbose=False):
         # break the string into words (making sure to take care of punctuation)
         test_words, string_literals, numeric_literals = self.split_string(sentence)
 
