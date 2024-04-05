@@ -7,7 +7,6 @@ from itertools import product
 from TokenMap import TokenMap
 from FunctionMap import FunctionMap
 from SemanticMapper import SemanticMapper
-from VariableMap import VariableMap
 
 
 class ActionLoader:
@@ -34,6 +33,8 @@ class ActionLoader:
         if not func.__doc__:
             print(f"Warning: {func.__name__} has no docstring. So it will not be loaded as an action.")
             return None, None
+
+        print(f"Registering action: {func.__name__}")
         description = func.__doc__.strip()
 
         # check to see if there is a "_<number" at the end of the function name, if so, then assign that number as the
@@ -137,9 +138,13 @@ class ActionLoader:
 
     def execute_action(self, token_id_list, action_string_list, priority=0):
         # Get the action from the string
-        func_ref, params = self.function_map.get_function_reference_and_params_by_signature(token_id_list, priority)
+        func_ref, params, func_prio = self.function_map.get_function_reference_and_params_by_signature(token_id_list)
         if func_ref is None:
-            return None
+            return 1, "Function not found"
+
+        # Check if the priority is the same
+        if func_prio != priority:
+            return 2, "Priority mismatch"
 
         print("Executing function", func_ref.__name__)
 
@@ -147,7 +152,6 @@ class ActionLoader:
         token_id_list = [-1 if token_id == -2 else token_id for token_id in token_id_list]
         action_string_list = [self.last_result if action_string == "_last_result_" else
                               action_string for action_string in action_string_list]
-
 
         # for each -1 in token_id_list ad the string in the action_string_list to the params
         parsed_args = []
@@ -157,6 +161,7 @@ class ActionLoader:
 
         # Execute the function
         self.last_result = func_ref(*parsed_args)
+        return 0, "Success"
 
     @staticmethod
     def auto_parse_parameter(input_str):
@@ -170,7 +175,37 @@ class ActionLoader:
         else:
             return input_str
 
+    def split_periods_and_conjunctions(self, input_string):
+        quoted_strings = re.findall(r'\"(.+?)\"', input_string) + re.findall(r'\'(.+?)\'', input_string)
+        for quoted_string in quoted_strings:
+            # replace the quoted string with a placeholder
+            input_string = input_string.replace(quoted_string, f"<<<QUOTED_STRING>>>")
+
+        # Split the input string by periods that end with a space or the end of the string
+        period_split = re.split(r"\.\s|\.$", input_string)
+
+        # Split each period-separated string by conjunctions (namely "and")
+        split_strings = []
+        for period_string in period_split:
+            split_strings.extend(period_string.split(" and "))
+
+        # Replace the placeholders with the original quoted strings in the split strings
+        for i, split_string in enumerate(split_strings):
+            if "<<<QUOTED_STRING>>>" in split_string:
+                split_strings[i] = split_string.replace("<<<QUOTED_STRING>>>", quoted_strings.pop(0))
+
+        return split_strings
+
     def parse_string(self, input_string):
+        # split the input string by periods and conjunctions
+        split_strings = self.split_periods_and_conjunctions(input_string)
+
+        for split_string in split_strings:
+            if len(split_string) == 0:
+                continue
+            self.parse_clause(split_string)
+
+    def parse_clause(self, input_string):
         action_string_list, filtered = self.semantic_mapper.parse_string(input_string)
         token_id_list = self.token_map.get_ids_from_string_list(filtered)
 
@@ -180,22 +215,33 @@ class ActionLoader:
         for priority in range(self.function_map.priority_levels):
             current_position = 0
             while current_position < len(token_id_list):
-                longest_signature = self.function_map.match_longest_signature(token_id_list[current_position:], priority)
+                longest_signature = self.function_map.match_longest_signature(token_id_list[current_position:],
+                                                                              priority)
                 if longest_signature is not None:
                     print(f"Matched signature: {longest_signature} at position {current_position} priority {priority}")
-                    self.execute_action(longest_signature,
-                                        action_string_list[current_position:current_position + len(longest_signature)],
-                                        priority)
+                    code, description = self.execute_action(longest_signature,
+                                                            action_string_list[
+                                                            current_position:current_position + len(longest_signature)],
+                                                            priority)
+
+                    if code == 2:
+                        current_position += len(longest_signature)
+                        continue
+
                     # Replace the matched tokens with a parameter token, and the string with the result
                     token_id_list[current_position] = -1
                     action_string_list[current_position] = self.last_result
 
-                    #delete the rest of the tokens
+                    # delete the rest of the tokens
                     for i in range(1, len(longest_signature)):
                         token_id_list.pop(current_position + 1)
                         action_string_list.pop(current_position + 1)
 
+                    current_position = 0
+                    continue
+
                 current_position += 1
+
 
 if __name__ == "__main__":
     action_loader = ActionLoader()
@@ -205,6 +251,7 @@ if __name__ == "__main__":
         print(f"Error loading actions: {error_state}")
     print(f"Loaded {len(action_loader.function_map)} actions")
 
+    '''
     # Test the running of an action
     action_loader.parse_string("grab webpage at 'https://en.wikipedia.org/wiki/Golem' and save it to a variable named 'golem_page'")
 
@@ -213,10 +260,17 @@ if __name__ == "__main__":
 
     # Test the running of an action
     action_loader.parse_string("save webpage at 'https://en.wikipedia.org/wiki/Golem' to file 'golem2.txt'")
+
     # Test the running of an action
     action_loader.parse_string(
         "Save webpage at 'https://blazblue.fandom.com/wiki/Rachel_Alucard' to a variable named 'rachel_text'.")
     action_loader.parse_string(
-        "Save value from variable 'rachel_text' to file 'rachel.txt'.")
+        "Save variable 'rachel_text' to file 'rachel.txt'.")
+
+    action_loader.parse_string("Search for 'golem' on wikipedia and save it to a file named 'wikigolem.txt'")
+
+    '''
+    action_loader.parse_string("Search for 'sweer potato and french fried'.")
+    print(action_loader.last_result)
 
     print("done running actions")

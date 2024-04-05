@@ -9,7 +9,7 @@ def store_variable_1(data, name):
     return data
 
 def get_variable_0(name):
-    """(get) value from variable (named) <Var_name>"""
+    """(get) (value) (from) variable (named) <Var_name>"""
     return VariableMap.get_instance().get_data(name)
 
 def store_file_1(data, name):
@@ -32,3 +32,4 @@ def webpage_0(url):
     h.ignore_links = False
     text = h.handle(html_content)
     return text
+

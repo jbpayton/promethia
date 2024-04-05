@@ -25,8 +25,18 @@ class TokenMap:
 
     def add_or_get_token_id(self, token):
         """Add a new token to the map and return its unique ID. If the token already exists, return its ID."""
+
+        # first check if the token is a synonym, if so, then return the id of the original token
+        # (search for the token in the dict values, not keys)
+        for key, value in self.synonyms.items():
+            if token in value:
+                token = key
+                break
+
+
         # The defaultdict takes care of assigning a new ID if necessary
         token_id = self.token_to_id[token]
+
         # Update the reverse map
         self.id_to_token[token_id] = token
 
