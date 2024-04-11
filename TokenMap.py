@@ -11,9 +11,10 @@ class TokenMap:
 
         # hardcode "__param__" token to id 0
         self.token_to_id["__param__"] = -1
-        self.token_to_id["_s_literal_"] = -1
-        self.token_to_id["_n_literal_"] = -1
+        self.token_to_id["_unknown_"] = -1
         self.token_to_id["_last_result_"] = -2
+        self.token_to_id["_null_"] = -3
+        self.token_to_id["_stop_"] = -4
         self.id_to_token[-1] = "__param__"
         self.id_to_token[-2] = "_last_result_"
 
@@ -43,6 +44,8 @@ class TokenMap:
         # check to see if this token has synonyms, if so, then add the list of synonyms to the string_to_synonyms_map
         if token in self.synonyms:
             self.string_to_synonyms_map[token] = self.synonyms[token]
+        else:
+            self.string_to_synonyms_map[token] = [token]
 
         return token_id
 
@@ -55,6 +58,9 @@ class TokenMap:
         for string in string_list:
             ids.append(self.token_to_id[string])
         return ids
+
+    def get_synonyms_map(self):
+        return self.string_to_synonyms_map
 
 
 if __name__ == "__main__":

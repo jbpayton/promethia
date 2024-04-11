@@ -1,7 +1,9 @@
 import re
 
+import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
+
 
 class SemanticMapper:
     def __init__(self, ids_to_descriptions = None, similarity_threshold = 0.7, embedding_model = None):
@@ -9,6 +11,10 @@ class SemanticMapper:
         self.ids = []
         self.d = 0
         self.index = None
+        self.pronouns = ["it", "he", "she", "they", "them", "him", "her", "his", "hers", "its", "their", "theirs"]
+        self.articles = ["the", "a", "an"]
+        self.conjunctions = ["and"]
+
 
         self.threshold = similarity_threshold
 
@@ -98,6 +104,44 @@ class SemanticMapper:
         matching_ids = [matching_ids[i][0] for i in range(len(matching_ids))]
         return test_words, matching_ids
 
+    def parse_word(self, word, verbose=False):
+        filter_word = self.filter_special_word(word)
+        if filter_word is not None:
+            return filter_word
+
+        # get the embeddings for the words
+        test_embedding = self.model.encode(word)
+
+        D, I = self.index.search(np.array([test_embedding]), 1)
+        matching_indices = I[0]
+
+        # filter out the words that are not similar enough
+        matching_indices = [matching_indices[j] for j in range(len(matching_indices)) if
+                               D[0][j] < self.threshold]
+
+        # matching indices is a list of lists, where each list contains the indices of the c
+        # now, for each word, find all the categories of the words that are similar to it
+        matching_ids = []
+        matching_ids.append([self.ids[j] for j in matching_indices])
+
+        if len(matching_ids) == 0:
+            matching_ids = ["_unknown_"]
+
+        if verbose:
+            # Now, for each word in the test string,
+            print(f"Word {word} points to the id {matching_ids}")
+            # then show the rounded distances of the words that are similar to it
+            for j in range(len(matching_indices)):
+                print(f"  Word {self.words[matching_indices[j]]} is at distance {round(D[0][j], 3)}")
+
+        # flatten the list of matching ids to the first in the list
+        if len(matching_ids[0]) == 0:
+            matching_id = "_unknown_"
+        else:
+            matching_id = matching_ids[0][0]
+
+        return matching_id
+
     @staticmethod
     def split_string(string):
         # get all quoted strings stored in a list (single or double quotes)
@@ -122,15 +166,24 @@ class SemanticMapper:
         words = SemanticMapper.remove_articles(words)
         return words, quoted_strings, numbers
 
-    @staticmethod
-    def remove_articles(words):
-        articles = ["the", "a", "an"]
-        words = [word for word in words if word not in articles]
+    def remove_articles(self, words):
 
-        pronouns = ["it", "he", "she", "they", "them", "him", "her", "his", "hers", "its", "their", "theirs"]
+        words = [word for word in words if word not in self.articles]
+
         # change the pronouns to a single word
-        words = [word if word not in pronouns else "_last_result_" for word in words]
+        words = [word if word not in self.pronouns else "_last_result_" for word in words]
         return words
+
+    def filter_special_word(self, word):
+        # if the word is a pronoun, then replace it with the last result
+        if word in self.pronouns:
+            return "_last_result_"
+        if word in self.articles:
+            return "_null_"
+        if word in self.conjunctions:
+            return "_stop_"
+        return None
+
 
 
 if __name__ == "__main__":
@@ -155,6 +208,8 @@ if __name__ == "__main__":
     start = time.time()
     sm.add_id_and_descriptions('delete', ["zap", "shoot", "fire", "destroy", "annihilate", "obliterate", "remove"])
     print(f"Time to add a new function: {time.time() - start}")
+
+    sm.parse_word("zap!!", verbose=True)
 
 
     start = time.time()
