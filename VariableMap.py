@@ -22,9 +22,13 @@ class VariableMap:
         print(f"Setting value {key}")
         self.data_map[key] = value
 
-    def get_data(self, key):
-        print(f"Getting {key}")
+    def get_data(self, key, verbose=False):
+        if verbose:
+            print(f"Getting {key}")
         return self.data_map.get(key, None)
+
+    def is_variable(self, key):
+        return key in self.data_map
 
 
 if __name__ == "__main__":

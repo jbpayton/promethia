@@ -15,6 +15,7 @@ class TokenMap:
         self.token_to_id["_last_result_"] = -2
         self.token_to_id["_null_"] = -3
         self.token_to_id["_stop_"] = -4
+        self.token_to_id["_variable_"] = -5
         self.id_to_token[-1] = "__param__"
         self.id_to_token[-2] = "_last_result_"
 

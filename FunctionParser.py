@@ -7,6 +7,7 @@ import os
 from itertools import product
 from TokenMap import TokenMap
 from SemanticMapper import SemanticMapper
+from VariableMap import VariableMap
 
 class Node:
     def __init__(self, token_id, next_nodes=None, action=None):
@@ -121,7 +122,7 @@ class ActionLoader:
         matches = re.findall(pattern, input_string)
         return matches
 
-    def parse_string(self, input_string):
+    def parse_string(self, input_string, verbose=False):
         words = self.split_words_and_string_literals(input_string)
         current_node = self.function_map.root
 
@@ -129,25 +130,57 @@ class ActionLoader:
         param_index = 0
         param_map = {}
 
+        if verbose:
+            print(f"Parsing string: {input_string}")
+
         while words:
             word = words.pop(0)
             token_id = self.token_from_word(word)
 
-            if token_id == -3:
-                # if we have  null token, we can skip it
+            if token_id == -4:
+                # a stop token only counts as a stop token if it is followed by noting or a valid next start of a sequence
+                peek_node = self.function_map.get_next_node(self.function_map.root, self.token_from_word(words[0]))
+                if not words or peek_node is not None:
+                    # if we have a stop token, we can stop parsing
+                    self.execute_function(current_node, param_map, verbose=verbose)
+                    param_map = {}
+                    current_node = self.function_map.root
+                    param_index = 0
+                else:
+                    token_id = -1
+
+            if token_id == -5:
+                #a variable is always a param, an entire param
+                value = VariableMap.get_instance().get_data(word)
+                param_map[param_index] = [value]
+                param_index += 1
+                next_node = self.function_map.get_next_node(current_node, -1)
+                if next_node is not None:
+                    current_node = next_node
+                    self.execute_function(current_node, param_map, verbose=verbose)
+                    param_map = {}
+                    current_node = self.function_map.root
+                    param_index = 0
+                else:
+                    current_node = self.function_map.root
                 continue
 
-            if token_id == -4:
-                # if we have a stop token, we can stop parsing
-                self.execute_function(current_node, param_map)
-                current_node = self.function_map.root
-                param_index = 0
-                break
+            if token_id == -3:
+                # check to see if this would work as a param
+                if not reading_param:
+                    if self.function_map.get_next_node(current_node, -1) is not None:
+                        token_id = -1
+                    else:
+                        # if we're not reading a param, we can skip the null token
+                        continue
 
             if current_node is not None:
                 next_node = self.function_map.get_next_node(current_node, token_id)
                 if next_node is not None:
                     current_node = next_node
+                else:
+                    current_node = self.function_map.root
+                    continue
 
             if current_node is not None:
                 if current_node.token_id == -1:
@@ -161,15 +194,25 @@ class ActionLoader:
                             word = words.pop(0)
                             token_id = self.token_from_word(word)
 
-                            if token_id == -3:
-                                # if we have  null token, we can skip it
-                                continue
-
                             # there are 3 possible cases here:
                             # 1. the word is an unknown token (token_id == -1)
                             # 2. the word is a known token, but it would not lead to a valid next node
                             # 3. the word is a known token, and it would lead to a valid next node
                             # in case 1, we add the word to the current param_map
+
+                            if token_id == -4:
+                                peek_node = self.function_map.get_next_node(self.function_map.root,
+                                                                            self.token_from_word(words[0]))
+                                if not words or peek_node is not None:
+                                    # if we have a stop token, we can stop parsing
+                                    reading_param = False
+                                    self.execute_function(current_node, param_map, verbose=verbose)
+                                    param_map = {}
+                                    current_node = self.function_map.root
+                                    param_index = 0
+                                    break
+                                else:
+                                    param_map[param_index].append(word)
 
                             if token_id == -1:
                                 param_map[param_index].append(word)
@@ -178,16 +221,14 @@ class ActionLoader:
                                 param_map[param_index].append(self.last_result)
                                 reading_param = False
                                 param_index += 1
-                            elif token_id == -3:
-                                # if we have  null token, we can skip it
-                                continue
-                            elif token_id == -4:
-                                # if we have a stop token, we can stop parsing
+                            elif self.function_map.get_next_node(self.function_map.root, token_id) is not None:
                                 reading_param = False
-                                self.execute_function(current_node, param_map)
+                                # push the word back into the stack
+                                words.insert(0, word)
+                                self.execute_function(current_node, param_map, verbose=verbose)
+                                param_map = {}
                                 current_node = self.function_map.root
                                 param_index = 0
-                                break
                             else:
                                 next_node = self.function_map.get_next_node(current_node, token_id)
                                 if next_node is not None:
@@ -199,15 +240,24 @@ class ActionLoader:
                         else:
                             reading_param = False
                             # if the string ends while reading a param then we are done
-                            self.execute_function(current_node, param_map)
+                            self.execute_function(current_node, param_map, verbose=verbose)
+                            param_map = {}
                             current_node = self.function_map.root
                             param_index = 0
                             break
+                elif token_id == -3: # if not a param and we have a null token, we can skip it
+                    # if we have a null token, we can skip it
+                    continue
         else:
             if current_node is not None:
-                self.execute_function(current_node, param_map)
+                if current_node.action is not None:
+                    self.execute_function(current_node, param_map)
 
-    def execute_function(self, current_node, param_map):
+    def execute_function(self, current_node, param_map, verbose=False):
+        if current_node is None:
+            if verbose:
+                print("No node found for this action")
+            return
         if current_node.action is not None:
             func_ref = current_node.action[0]
             params = current_node.action[1]
@@ -217,20 +267,29 @@ class ActionLoader:
                 parsed_args.append(" ".join(param_map[param_index]))
 
             self.last_result = func_ref(*parsed_args)
+
+            if verbose:
+                print(f"Executing function {func_ref.__name__} with params {parsed_args}")
+                print(f"Result: {self.last_result}")
         else:
-            print("No action found for this node")
+            if verbose:
+                print("No action found for this node")
 
 
     def token_from_word(self, word):
         # only parse a word if it is not a string literal
         if word[0] == '"' or word[0] == "'":
-            token_id = -1
+            return -1
+
         # also dont try to parse something without alpha characters in it
-        elif not any(c.isalpha() for c in word):
-            token_id = -1
-        else:
-            parsed_word = self.semantic_mapper.parse_word(word)
-            token_id = self.token_map.token_to_id.get(parsed_word, -1)
+        if not any(c.isalpha() for c in word):
+            return -1
+
+        if VariableMap.get_instance().is_variable(word):
+            return -5
+
+        parsed_word = self.semantic_mapper.parse_word(word)
+        token_id = self.token_map.token_to_id.get(parsed_word, -1)
         return token_id
 
 
@@ -251,6 +310,7 @@ if __name__ == "__main__":
     # Create a semantic mapper
     action_loader.semantic_mapper = SemanticMapper(action_loader.token_map.string_to_synonyms_map)
 
+    '''
     # Test cases
     action_loader.parse_string("say hello to Alice")
     print(action_loader.last_result)  # Output: Hello, Alice!
@@ -258,14 +318,25 @@ if __name__ == "__main__":
     action_loader.parse_string("say hello to Rachel Alucard")
     print(action_loader.last_result)  # Output: Hello, Rachel Alucard!
 
-    action_loader.parse_string("add 5 plus 3")
+    action_loader.parse_string("add 5 plus 3", verbose=True)
     print(action_loader.last_result)  # Output: 8
 
-    action_loader.parse_string("say hello to Bob and add 2 plus 4")
-    print(action_loader.last_result)  # Output: Hello, Bob!
+    action_loader.parse_string("say hello to Bob and add 2 plus 4", verbose=True)
     print(action_loader.last_result)  # Output: 6
 
-    action_loader.parse_string("unknown action")
+    action_loader.parse_string("say hello to the whole world add 2 plus 4", verbose=True)
+    print(action_loader.last_result)  # Output: 6
+
+    action_loader.parse_string("save a bunch of the fish and eels to variable bucket", verbose=True)
+    action_loader.parse_string("say hello to bucket", verbose=True)
+    
+    action_loader.parse_string("unknown action", verbose=True)
     print(action_loader.last_result)  # Output: None
+
+    action_loader.parse_string("say hello to bucket and add 1 plus 1", verbose=True)
+    action_loader.parse_string("I'mma gonna say hello to bucket and add 1 plus 1", verbose=True)
+    '''
+    action_loader.parse_string("Search for golem on wikipedia and save it to a file named 'wikigolem.txt'", verbose=True)
+
 
     print("Done running actions")
