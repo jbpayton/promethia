@@ -1,6 +1,4 @@
-import json
 import re
-from collections import defaultdict
 from inspect import signature, getmembers, isfunction
 import importlib.util
 import os
@@ -42,7 +40,7 @@ class FunctionMap:
         return None
 
 
-class ActionLoader:
+class PromethiaParser:
     def __init__(self, action_path="./promethia-actions", synonyms_file="promethia-actions/synonyms.json"):
         self.function_map = FunctionMap()
         self.action_path = action_path
@@ -134,8 +132,12 @@ class ActionLoader:
             print(f"Parsing string: {input_string}")
 
         while words:
+            bypass_param = False
             word = words.pop(0)
             token_id = self.token_from_word(word)
+
+            if verbose:
+                print(f"Current word: {word} ({token_id})")
 
             if token_id == -4:
                 # a stop token only counts as a stop token if it is followed by noting or a valid next start of a sequence
@@ -149,7 +151,15 @@ class ActionLoader:
                 else:
                     token_id = -1
 
-            if token_id == -5:
+            if token_id == -2:
+                #a variable is always a param, an entire param
+                value = VariableMap.get_instance().get_data(word)
+                param_map[param_index] = [value]
+                param_index += 1
+                bypass_param = True
+                token_id = -1
+
+            if token_id == -2:
                 #a variable is always a param, an entire param
                 value = VariableMap.get_instance().get_data(word)
                 param_map[param_index] = [value]
@@ -183,7 +193,7 @@ class ActionLoader:
                     continue
 
             if current_node is not None:
-                if current_node.token_id == -1:
+                if current_node.token_id == -1 and bypass_param is False:
                     if not reading_param:
                         param_map[param_index] = []
                         reading_param = True
@@ -193,6 +203,9 @@ class ActionLoader:
                         if words:
                             word = words.pop(0)
                             token_id = self.token_from_word(word)
+
+                            if verbose:
+                                print(f"In Parameter Parse - Current word: {word} ({token_id})")
 
                             # there are 3 possible cases here:
                             # 1. the word is an unknown token (token_id == -1)
@@ -213,14 +226,10 @@ class ActionLoader:
                                     break
                                 else:
                                     param_map[param_index].append(word)
+                                    continue
 
                             if token_id == -1:
                                 param_map[param_index].append(word)
-                            elif token_id == -2:
-                                # last result token
-                                param_map[param_index].append(self.last_result)
-                                reading_param = False
-                                param_index += 1
                             elif self.function_map.get_next_node(self.function_map.root, token_id) is not None:
                                 reading_param = False
                                 # push the word back into the stack
@@ -262,11 +271,21 @@ class ActionLoader:
             func_ref = current_node.action[0]
             params = current_node.action[1]
             parsed_args = []
+
             # go through the param_map and turn it into a list of arguments, joining the words
             for param_index in range(len(param_map)):
                 parsed_args.append(" ".join(param_map[param_index]))
 
+            # if any of the args are wrapped in quotes, remove them (but only if they are the first and last characters)
+            for i in range(len(parsed_args)):
+                if parsed_args[i][0] == '"' and parsed_args[i][-1] == '"':
+                    parsed_args[i] = parsed_args[i][1:-1]
+                if parsed_args[i][0] == "'" and parsed_args[i][-1] == "'":
+                    parsed_args[i] = parsed_args[i][1:-1]
+
             self.last_result = func_ref(*parsed_args)
+            # save last result to a variable named 'it'
+            VariableMap.get_instance().set_data("it", self.last_result)
 
             if verbose:
                 print(f"Executing function {func_ref.__name__} with params {parsed_args}")
@@ -286,7 +305,7 @@ class ActionLoader:
             return -1
 
         if VariableMap.get_instance().is_variable(word):
-            return -5
+            return -2
 
         parsed_word = self.semantic_mapper.parse_word(word)
         token_id = self.token_map.token_to_id.get(parsed_word, -1)
@@ -303,40 +322,62 @@ def add_numbers(num1, num2):
     return int(num1) + int(num2)
 
 if __name__ == "__main__":
-    action_loader = ActionLoader()
-    action_loader.register_action(greet)
-    action_loader.register_action(add_numbers)
+    action_parser = PromethiaParser()
+    action_parser.register_action(greet)
+    action_parser.register_action(add_numbers)
 
     # Create a semantic mapper
-    action_loader.semantic_mapper = SemanticMapper(action_loader.token_map.string_to_synonyms_map)
+    action_parser.semantic_mapper = SemanticMapper(action_parser.token_map.string_to_synonyms_map)
 
-    '''
     # Test cases
-    action_loader.parse_string("say hello to Alice")
-    print(action_loader.last_result)  # Output: Hello, Alice!
+    action_parser.parse_string("say hello to Alice")
+    assert action_parser.last_result == "Hello, Alice!"
 
-    action_loader.parse_string("say hello to Rachel Alucard")
-    print(action_loader.last_result)  # Output: Hello, Rachel Alucard!
+    action_parser.parse_string("say hello to Rachel Alucard")
+    assert action_parser.last_result == "Hello, Rachel Alucard!"
 
-    action_loader.parse_string("add 5 plus 3", verbose=True)
-    print(action_loader.last_result)  # Output: 8
+    action_parser.parse_string("add 5 plus 3", verbose=True)
+    assert action_parser.last_result == 8
 
-    action_loader.parse_string("say hello to Bob and add 2 plus 4", verbose=True)
-    print(action_loader.last_result)  # Output: 6
+    action_parser.parse_string("say hello to Bob and add 2 plus 4", verbose=True)
+    assert action_parser.last_result == 6
 
-    action_loader.parse_string("say hello to the whole world add 2 plus 4", verbose=True)
-    print(action_loader.last_result)  # Output: 6
+    action_parser.parse_string("say hello to the whole world add 2 plus 4", verbose=True)
+    assert action_parser.last_result == 6
 
-    action_loader.parse_string("save a bunch of the fish and eels to variable bucket", verbose=True)
-    action_loader.parse_string("say hello to bucket", verbose=True)
+    action_parser.parse_string("save a bunch of the fish and eels to variable bucket", verbose=True)
+    assert action_parser.last_result == "a bunch of the fish and eels"
+    action_parser.parse_string("say hello to bucket", verbose=True)
+    assert action_parser.last_result == "Hello, a bunch of the fish and eels!"
+
     
-    action_loader.parse_string("unknown action", verbose=True)
-    print(action_loader.last_result)  # Output: None
+    action_parser.parse_string("unknown action", verbose=True)
 
-    action_loader.parse_string("say hello to bucket and add 1 plus 1", verbose=True)
-    action_loader.parse_string("I'mma gonna say hello to bucket and add 1 plus 1", verbose=True)
-    '''
-    action_loader.parse_string("Search for golem on wikipedia and save it to a file named 'wikigolem.txt'", verbose=True)
+    action_parser.parse_string("say hello to bucket and add 1 plus 1", verbose=True)
+    assert action_parser.last_result == 2
 
+    action_parser.parse_string("I'mma gonna say hello to bucket and add 1 plus 1", verbose=True)
+    assert action_parser.last_result == 2
 
-    print("Done running actions")
+    # delete wikigolem.txt if it exists
+    if os.path.exists("wikigolem.txt"):
+        os.remove("wikigolem.txt")
+
+    action_parser.parse_string("Search wikipedia for 'golem' and save it to a file named 'wikigolem.txt'", verbose=True)
+    # assert tha the file wikigolem.txt exists
+    assert os.path.exists("wikigolem.txt")
+    # also assert that the file contains the word 'golem'
+    with open("wikigolem.txt", "r", encoding="utf-8") as f:
+        assert "golem" in f.read()
+
+    # delete golem_page.txt if it exists
+    if os.path.exists("golem_page.txt"):
+        os.remove("golem_page.txt")
+    action_parser.parse_string("fetch webpage at 'https://en.wikipedia.org/wiki/Golem' and save it to a variable named 'golem_page'")
+    assert VariableMap.get_instance().get_data("golem_page") is not None
+    golem_page = VariableMap.get_instance().get_data("golem_page")
+    assert "golem" in golem_page
+    action_parser.parse_string("save golem_page to a file named 'golem_page.txt'")
+    assert os.path.exists("golem_page.txt")
+
+    print("Done running actions successfully!")

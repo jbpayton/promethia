@@ -2,7 +2,7 @@ from duckduckgo_search import DDGS
 import wikipedia
 
 def search_wikipedia_0(query):
-    """search for <query> on wikipedia"""
+    """search wikipedia for <query>"""
     output = wikipedia.summary(query, auto_suggest=False)
     return output
 

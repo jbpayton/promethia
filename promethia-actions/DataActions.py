@@ -24,7 +24,7 @@ def get_file_0(name):
         return f.read()
 
 def webpage_0(url):
-    """webpage (from) <url>"""
+    """fetch webpage (from) <url>"""
     response = requests.get(url)
     html_content = response.text
 

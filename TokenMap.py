@@ -12,12 +12,11 @@ class TokenMap:
         # hardcode "__param__" token to id 0
         self.token_to_id["__param__"] = -1
         self.token_to_id["_unknown_"] = -1
-        self.token_to_id["_last_result_"] = -2
+        self.token_to_id["_variable_"] = -2
         self.token_to_id["_null_"] = -3
         self.token_to_id["_stop_"] = -4
-        self.token_to_id["_variable_"] = -5
         self.id_to_token[-1] = "__param__"
-        self.id_to_token[-2] = "_last_result_"
+        self.id_to_token[-2] = "_variable_"
 
         # load synonyms
         self.synonyms = {}
