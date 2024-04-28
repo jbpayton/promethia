@@ -5,6 +5,7 @@
   "webpage": ["web page", "site", "page", "website"],
   "from": ["out of", "off of", "at", "from"],
   "url": ["link", "address", "web address", "web link"],
+  "web": ["internet", "online"],
   "file": ["document", "record", "folder", "path"],
   "save": ["record", "write", "log", "store"],
   "to": ["into", "in", "on", "toward", "for", "as", "onto"],

@@ -18,7 +18,7 @@ class FunctionMap:
     def __init__(self):
         self.root = Node(None)
 
-    def assign_function_reference_to_signature(self, token_signature, function_reference, parameters):
+    def assign_function_reference_to_signature(self, token_signature, function_reference, parameters, docstring):
         current_node = self.root
         for token_id in token_signature:
             match_found = False
@@ -31,7 +31,7 @@ class FunctionMap:
                 new_node = Node(token_id)
                 current_node.next_nodes.append(new_node)
                 current_node = new_node
-        current_node.action = (function_reference, parameters)
+        current_node.action = (function_reference, parameters, docstring)
 
     def get_next_node(self, current_node, token_id):
         for next_node in current_node.next_nodes:
@@ -71,7 +71,7 @@ class PromethiaParser:
         # Generate token signature tuples
         token_signature_tuples = self.generate_token_signature_tuples(token_ids, optional_map)
         for token_signature in token_signature_tuples:
-            self.function_map.assign_function_reference_to_signature(token_signature, func, params)
+            self.function_map.assign_function_reference_to_signature(token_signature, func, params, description)
 
     @staticmethod
     def generate_token_signature_tuples(token_ids, optional_map):
@@ -381,3 +381,10 @@ if __name__ == "__main__":
     assert os.path.exists("golem_page.txt")
 
     print("Done running actions successfully!")
+
+    # perform a web search
+    # remove the file rachel alucard.txt if it exists
+    if os.path.exists("rachel alucard.txt"):
+        os.remove("rachel alucard.txt")
+
+    action_parser.parse_string("search the web for 'Rachel Alucard' and save it to a file named 'rachel alucard.txt'")
